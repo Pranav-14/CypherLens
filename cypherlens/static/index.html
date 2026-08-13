@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CypherLens — Precision Web Search Simplifier & Price Radar</title>
-    <meta name="description" content="A zero-cost, real-time search simplifier and price radar. Instant products, flights, and hardware comparison across Germany/EU, India, US, and UK.">
+    <title>CypherLens 2.0 — Conversational Web Intelligence & Price Radar</title>
+    <meta name="description" content="Conversational AI research agent, cross-border price arbitrage, transit analytics, and precision web search without redirect loops.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -23,141 +23,118 @@
                     <div class="pulse-dot"></div>
                 </div>
                 <div class="brand-text">
-                    <h1 class="brand-title">CYPHER<span>LENS</span></h1>
-                    <p class="brand-tagline">Precision search simplifier &amp; regional price radar</p>
+                    <h1 class="brand-title">CYPHER<span>LENS 2.0</span></h1>
+                    <p class="brand-tagline">Conversational Web Intelligence &amp; Cross-Border Price Radar</p>
                 </div>
             </div>
 
             <div class="header-actions">
                 <!-- Regional Hub Selector -->
-                <div class="region-selector-wrapper">
-                    <span class="region-icon">🌍</span>
-                    <select id="regionSelect" class="region-select">
-                        <option value="de" selected>🇩🇪 Germany &amp; EU (€)</option>
-                        <option value="in">🇮🇳 India (₹)</option>
-                        <option value="us">🇺🇸 USA &amp; Global ($)</option>
-                        <option value="uk">🇬🇧 UK (£)</option>
+                <div class="control-group">
+                    <span class="control-icon">🌍</span>
+                    <select id="regionSelect" class="styled-select" title="Target Regional Stores & Transit Hubs">
+                        <option value="de" selected>🇩🇪 Germany / EU</option>
+                        <option value="in">🇮🇳 India</option>
+                        <option value="us">🇺🇸 USA &amp; Global</option>
+                        <option value="uk">🇬🇧 United Kingdom</option>
                     </select>
                 </div>
 
-                <button id="toggleWatchlistBtn" class="btn-secondary" title="View Pinned Deals">
+                <!-- Currency Display Switcher -->
+                <div class="control-group">
+                    <span class="control-icon">💱</span>
+                    <select id="currencySelect" class="styled-select" title="Display Currency">
+                        <option value="EUR" selected>EUR (€)</option>
+                        <option value="INR">INR (₹)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="AED">AED (د.إ)</option>
+                        <option value="CAD">CAD (CA$)</option>
+                        <option value="JPY">JPY (¥)</option>
+                        <option value="SGD">SGD (SG$)</option>
+                    </select>
+                </div>
+
+                <!-- Settings / BYOK Auth Modal Trigger -->
+                <button id="openSettingsBtn" class="btn-secondary" title="Connect Google Gemini / OpenAI API Key">
+                    <span class="btn-icon">⚙️</span> <span id="providerBadge">AI: Free Tier</span>
+                </button>
+
+                <button id="toggleWatchlistBtn" class="btn-secondary" title="View Pinned Items">
                     <span class="btn-icon">📌</span> Watchlist <span id="watchlistCount" class="badge-counter">0</span>
                 </button>
-                <div class="system-status">
-                    <span class="status-indicator online"></span> RADAR ACTIVE
-                </div>
             </div>
         </header>
 
-        <!-- Main Search Radar Section -->
-        <section class="search-section">
-            <div class="search-card glass-panel">
-                <form id="searchForm" class="search-form">
-                    <div class="search-input-wrapper">
-                        <span class="search-crosshair">🎯</span>
-                        <input 
-                            type="text" 
-                            id="queryInput" 
-                            class="search-input" 
-                            placeholder="Enter prompt (e.g. 'RTX 4070 laptop under 1500 euros', 'frankfurt to bangalore dec 12 to jan 17', 'Kindle Amazon')..."
-                            autocomplete="off"
+        <!-- Conversational Chat Stream -->
+        <main class="chat-container">
+            <div id="chatFeed" class="chat-feed">
+                <!-- Welcome Initial Card -->
+                <div class="assistant-message glass-panel">
+                    <div class="msg-header">
+                        <span class="agent-badge">📡 CYPHERLENS RADAR ONLINE</span>
+                        <span class="agent-time">Ready</span>
+                    </div>
+                    <div class="msg-body">
+                        <h2>How can I help your research or shopping today?</h2>
+                        <p>Ask for any product recommendation, compare prices across countries, or check flight &amp; train transit analytics.</p>
+                        
+                        <div class="feature-bullets">
+                            <div class="feature-card">
+                                <span class="f-icon">🛒</span>
+                                <h4>Proactive Shopping Agent</h4>
+                                <p>Ask <em>"I want a wireless gaming mouse"</em> — I'll clarify your budget and scout the best picks across local stores.</p>
+                            </div>
+                            <div class="feature-card">
+                                <span class="f-icon">🌍</span>
+                                <h4>Cross-Border Arbitrage</h4>
+                                <p>Ask <em>"Compare price of Asus ROG Zephyrus in Germany vs India"</em> to see where you save the most money.</p>
+                            </div>
+                            <div class="feature-card">
+                                <span class="f-icon">✈️</span>
+                                <h4>Precision Transit &amp; Flights</h4>
+                                <p>Ask <em>"Frankfurt to Bangalore Dec 12 to Jan 17"</em> for locked airport route matrices and pre-filled links.</p>
+                            </div>
+                        </div>
+
+                        <!-- Prompt Presets -->
+                        <div class="quick-prompts" style="margin-top: 20px;">
+                            <span class="quick-label">Try Asking:</span>
+                            <button class="prompt-chip" data-prompt="I am looking for a wireless gaming mouse">🖱️ Wireless Gaming Mouse</button>
+                            <button class="prompt-chip" data-prompt="Compare Asus ROG Zephyrus G14 price in Germany vs India">🌍 Laptop Price: DE vs IN</button>
+                            <button class="prompt-chip" data-prompt="frankfurt to bangalore december 12th to january 17th">✈️ Frankfurt ➔ Bangalore Flights</button>
+                            <button class="prompt-chip" data-prompt="RTX 4070 gaming laptop under 1500 euros">💻 RTX 4070 Laptop &lt; 1500€</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="chatLoading" class="chat-loading" style="display: none;">
+                <div class="scanner-ring small"></div>
+                <span>Scouting web matrix and analyzing intelligence...</span>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="chat-input-container glass-panel">
+                <form id="chatForm" class="chat-form">
+                    <div class="chat-input-wrapper">
+                        <textarea 
+                            id="chatInput" 
+                            class="chat-input" 
+                            placeholder="Ask anything... (e.g. 'I want a gaming mouse', 'compare MacBook price in Germany vs US', 'Frankfurt to Bangalore flight')"
+                            rows="1"
                             required
-                        >
-                        <button type="submit" id="searchSubmitBtn" class="btn-search">
-                            <span>SEARCH</span>
+                        ></textarea>
+                        <button type="submit" id="sendBtn" class="btn-send">
+                            <span>SEND</span>
                             <span class="btn-glow"></span>
                         </button>
                     </div>
                 </form>
-
-                <!-- Category Filters -->
-                <div class="category-pills">
-                    <button class="pill active" data-category="auto">⚡ Auto Detect</button>
-                    <button class="pill" data-category="amazon">📦 Shopping &amp; Deals</button>
-                    <button class="pill" data-category="flight">✈️ Flight Matrix</button>
-                    <button class="pill" data-category="tech">💻 Tech &amp; Hardware</button>
-                    <button class="pill" data-category="general">🌐 Web Search</button>
-                </div>
-
-                <!-- Quick Query Chips (Region-aware presets) -->
-                <div class="quick-prompts">
-                    <span class="quick-label">Presets:</span>
-                    <button class="prompt-chip" data-query="frankfurt to bangalore december 12th to january 17th">✈️ Frankfurt ➔ Bangalore (Dec-Jan)</button>
-                    <button class="prompt-chip" data-query="RTX 4070 gaming laptop under 1500 euros">💻 RTX 4070 Laptop &lt; 1500€</button>
-                    <button class="prompt-chip" data-query="Sony WH-1000XM5 headphones amazon deals">🎧 Sony XM5 Headphones</button>
-                    <button class="prompt-chip" data-query="Best OLED smartphones 2026 deals">📱 OLED Flagship Phones</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Deep Radar Hubs (Launchpad) -->
-        <section id="deepRadarSection" class="deep-radar-section" style="display: none;">
-            <div class="section-header">
-                <h3>⚡ 1-Click Direct Hubs &amp; Pre-Filled Route Matrix</h3>
-                <span class="section-subtitle">Deep links pre-filled with exact airport codes, dates, and regional stores</span>
-            </div>
-            <div id="deepRadarContainer" class="deep-radar-grid"></div>
-        </section>
-
-        <!-- Search Status / Meta -->
-        <section id="statusSection" class="status-section" style="display: none;">
-            <div class="meta-strip glass-panel">
-                <div class="meta-item">
-                    <span class="meta-label">TARGET</span>
-                    <span id="metaTarget" class="meta-val highlight">-</span>
-                </div>
-                <div class="meta-item">
-                    <span class="meta-label">LENS</span>
-                    <span id="metaLens" class="meta-val badge-lens">-</span>
-                </div>
-                <div class="meta-item">
-                    <span class="meta-label">REGION</span>
-                    <span id="metaRegion" class="meta-val badge-region">-</span>
-                </div>
-                <div class="meta-item">
-                    <span class="meta-label">RESULTS</span>
-                    <span id="metaNodes" class="meta-val">-</span>
-                </div>
-                <div class="meta-item">
-                    <span class="meta-label">LATENCY</span>
-                    <span id="metaLatency" class="meta-val">-</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Loading State -->
-        <div id="loadingContainer" class="loading-container" style="display: none;">
-            <div class="scanner-ring">
-                <div class="scanner-sweep"></div>
-            </div>
-            <p class="loading-text">Scouting regional web matrix in real-time...</p>
-        </div>
-
-        <!-- Results Grid -->
-        <main class="results-main">
-            <div id="resultsGrid" class="results-grid"></div>
-
-            <!-- Empty State Initial -->
-            <div id="initialState" class="empty-state">
-                <div class="empty-icon">📡</div>
-                <h2>CypherLens Precision Radar Ready</h2>
-                <p>Type any product, flight route with dates, tech spec, or search prompt above to get clean, ad-free clickable cards with exact pre-filled links in real time.</p>
-                <div class="feature-bullets">
-                    <div class="feature-card">
-                        <span class="f-icon">✈️</span>
-                        <h4>Precision Route Formatter</h4>
-                        <p>Automatically resolves city names to exact IATA airport codes (<code>FRA</code>, <code>BLR</code>) and parses dates directly into Google Flights &amp; Skyscanner.</p>
-                    </div>
-                    <div class="feature-card">
-                        <span class="f-icon">🌍</span>
-                        <h4>Regional Localization</h4>
-                        <p>Searches localized stores (Idealo.de, Geizhals, Amazon.de for Germany/EU; Flipkart &amp; Amazon.in for India; Best Buy for US) in local currencies.</p>
-                    </div>
-                    <div class="feature-card">
-                        <span class="f-icon">💰</span>
-                        <h4>100% Free &amp; Zero Setup</h4>
-                        <p>Completely free, no login or API keys needed. Open source and ready to run.</p>
-                    </div>
+                <div class="input-footer">
+                    <span>💡 Press <kbd>Enter</kbd> to send, <kbd>Shift + Enter</kbd> for new line. Type <kbd>/clear</kbd> to reset memory.</span>
+                    <button id="resetSessionBtn" class="btn-text">🔄 Reset Conversation</button>
                 </div>
             </div>
         </main>
@@ -166,7 +143,7 @@
     <!-- Pinned Watchlist Drawer -->
     <div id="watchlistDrawer" class="watchlist-drawer">
         <div class="drawer-header">
-            <h3>📌 Pinned Items (<span id="drawerCount">0</span>)</h3>
+            <h3>📌 Pinned Intelligence (<span id="drawerCount">0</span>)</h3>
             <button id="closeDrawerBtn" class="btn-close">✕</button>
         </div>
         <div id="watchlistItems" class="drawer-content">
@@ -178,6 +155,47 @@
     </div>
     <div id="drawerOverlay" class="drawer-overlay"></div>
 
+    <!-- BYOK / Settings Modal -->
+    <div id="settingsModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <h3>⚙️ Connect Your AI Account (BYOK)</h3>
+                <button id="closeSettingsBtn" class="btn-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-intro">
+                    Connect your personal API key for unlimited personalized requests. 
+                    <strong>Google Gemini offers a 100% free tier</strong> (15 requests/min, no credit card required).
+                </p>
+
+                <div class="form-group">
+                    <label for="aiProviderSelect">AI Provider</label>
+                    <select id="aiProviderSelect" class="form-control">
+                        <option value="gemini" selected>Google Gemini (Recommended - Free Tier Available)</option>
+                        <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+                        <option value="claude">Anthropic Claude (Claude 3.5 Sonnet)</option>
+                        <option value="zero_key">Zero-Key (Built-in Free Heuristic Mode)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="apiKeyGroup">
+                    <label for="apiKeyInput">API Key <span id="keyStatusBadge"></span></label>
+                    <input type="password" id="apiKeyInput" class="form-control" placeholder="Enter your API key (e.g. AIzaSy...)">
+                    <small class="form-hint">Your API key is stored securely in your local user directory.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="modelInput">Model Name (Optional)</label>
+                    <input type="text" id="modelInput" class="form-control" placeholder="gemini-1.5-flash">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="saveConfigBtn" class="btn-search">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="/static/app.js"></script>
 </body>
 </html>

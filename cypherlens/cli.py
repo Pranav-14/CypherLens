@@ -1,5 +1,5 @@
 """
-CypherLens CLI - Terminal Search Simplifier with Native Clickable Links & Regional Routing.
+CypherLens CLI - Conversational Search Simplifier with Native Clickable Links, Multi-Turn Chat & Arbitrage.
 """
 
 import sys
@@ -8,7 +8,6 @@ import webbrowser
 import click
 from typing import Optional
 
-# Ensure UTF-8 output for Windows terminals
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -21,9 +20,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.prompt import Prompt
+from rich.markdown import Markdown
 
-from cypherlens.engines.orchestrator import CypherOrchestrator
-from cypherlens.engines.base import LensResponse
+from cypherlens.engines.chat_session import CypherChatSession
+from cypherlens.engines.currency import CurrencyConverter
+from cypherlens.engines.ai_provider import AIProviderManager
+from cypherlens.engines.geo_resolver import GeoResolver
 
 console = Console(force_terminal=True, legacy_windows=False)
 
@@ -34,132 +36,49 @@ CYPHER_BANNER = """[bold #00f5d4]
  ██║       ╚██╔╝  ██╔═══╝ ██╔══██║██╔══╝  ██╔══██╗██║     ██╔══╝  ██║╚██╗██║╚════██║
  ╚██████╗   ██║   ██║     ██║  ██║███████╗██║  ██║███████╗███████╗██║ ╚████║███████║
   ╚═════╝   ╚═╝   ╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝[/bold #00f5d4]
-        [bold #ffd166]>> Real-Time Search Simplifier & Price Radar <<[/bold #ffd166]
+        [bold #ffd166]>> Conversational Web Intelligence & Price Radar <<[/bold #ffd166]
 """
 
 
-def render_response(res: LensResponse, export_md: Optional[str] = None, export_json: bool = False):
-    """Renders structured scout results with Rich terminal panels and clickable links."""
-    if export_json:
-        console.print_json(res.model_dump_json())
-        return
+def render_chat_turn(response: dict):
+    """Renders assistant response cleanly in rich markdown with structured cards if present."""
+    content = response.get("content", "")
+    struct = response.get("structured_data", {})
+    resp_type = response.get("type", "general")
 
-    # Header Panel
-    cat_badges = {
-        "flight": "✈ FLIGHT RADAR",
-        "amazon": "📦 AMAZON & SHOPPING",
-        "tech": "💻 TECH & HARDWARE",
-        "general": "🌐 WEB SEARCH"
-    }
-    cat_title = cat_badges.get(res.detected_category, "🔍 WEB SEARCH")
-    
-    header_text = Text()
-    header_text.append(f"Target: ", style="bold white")
-    header_text.append(f'"{res.query}"', style="bold #00f5d4")
-    header_text.append(f"  |  Lens: ", style="bold white")
-    header_text.append(f"{cat_title}", style="bold #ffd166")
-    header_text.append(f"  |  Region: ", style="bold white")
-    header_text.append(f"{res.region_name} ({res.currency})", style="bold #06d6a0")
-    header_text.append(f"  |  Latency: ", style="dim")
-    header_text.append(f"{res.execution_time_ms}ms\n", style="dim cyan")
-    header_text.append(f"{res.summary}", style="italic #e0e0e0")
+    # Render Markdown response text
+    console.print(Markdown(content))
 
-    console.print(Panel(header_text, border_style="#00f5d4", title="[bold #00f5d4]CYPHERLENS RADAR ACTIVE[/bold #00f5d4]", subtitle="[dim]Hold Ctrl/Cmd + Click any link to open in browser[/dim]"))
+    # Render Clarification Options (if any)
+    if resp_type == "clarification":
+        questions = struct.get("questions", [])
+        for q in questions:
+            console.print(f"\n[bold #ffd166]{q['label']}[/bold #ffd166]")
+            opts_text = "  • " + "   • ".join([f"[cyan]{opt}[/cyan]" for opt in q.get("options", [])])
+            console.print(opts_text)
 
-    # Render Deep Radar Action Links (if any)
-    if res.deep_links:
-        radar_table = Table(title="[bold #ffd166]⚡ 1-Click Direct Hubs & Route Matrix[/bold #ffd166]", show_header=True, header_style="bold cyan", border_style="dim")
+    # Render Deep Links (if any)
+    deep_links = struct.get("deep_links", [])
+    if deep_links:
+        radar_table = Table(title="[bold #ffd166]⚡ 1-Click Direct Pre-Filled Hubs[/bold #ffd166]", show_header=True, header_style="bold cyan", border_style="dim")
         radar_table.add_column("Hub / Matrix", style="bold white", width=30)
-        radar_table.add_column("Direct Hyperlink (Click to Open Pre-Filled Search)", style="cyan")
+        radar_table.add_column("Direct Hyperlink (Click to Open)", style="cyan")
         radar_table.add_column("Type", style="dim yellow", justify="center")
 
-        for dl in res.deep_links:
+        for dl in deep_links:
             clickable_url = f"[link={dl['url']}]{dl['url'][:62]}...[/link]"
             radar_table.add_row(dl['title'], clickable_url, f"[{dl.get('badge', 'Direct Hub')}]")
         
         console.print(radar_table)
-        console.print("")
-
-    # Render Result Cards / Table
-    if not res.items:
-        console.print("[yellow]No direct results matched this query. Try rephrasing or broadening terms.[/yellow]")
-        return
-
-    table = Table(
-        title=f"[bold #00f5d4]Scouted Results ({len(res.items)} items in {res.currency})[/bold #00f5d4]",
-        show_header=True,
-        header_style="bold #00f5d4",
-        border_style="#00f5d4",
-        show_lines=True
-    )
-    table.add_column("#", style="dim", width=3, justify="center")
-    table.add_column("Product / Result Title", style="bold white", min_width=32)
-    table.add_column("Price / Specs", style="bold #06d6a0", width=22)
-    table.add_column("Source", style="bold yellow", width=16)
-    table.add_column("Action / Direct Link", style="bold cyan", width=24)
-
-    for idx, item in enumerate(res.items, start=1):
-        # Specs and Price
-        spec_text = []
-        if item.price:
-            spec_text.append(f"[bold #06d6a0]{item.price}[/bold #06d6a0]")
-        if item.rating:
-            spec_text.append(f"[yellow]{item.rating}[/yellow]")
-        if item.specs:
-            spec_text.extend([f"[dim cyan]• {s}[/dim cyan]" for s in item.specs[:2]])
-        
-        price_specs_content = "\n".join(spec_text) if spec_text else "[dim]Live Fares/Pricing[/dim]"
-
-        # Direct Clickable Link Text
-        link_display = f"[bold underline cyan link={item.url}]>> Open Deal >>[/bold underline cyan link]"
-        
-        # Title with snippet
-        title_content = Text()
-        title_content.append(item.title[:85] + ("..." if len(item.title) > 85 else ""), style="bold white")
-        if item.snippet:
-            snippet_clean = item.snippet[:120].replace("\n", " ") + ("..." if len(item.snippet) > 120 else "")
-            title_content.append(f"\n[dim]{snippet_clean}[/dim]")
-
-        table.add_row(
-            str(idx),
-            title_content,
-            price_specs_content,
-            f"[{item.source}]\n[dim]{item.badge or ''}[/dim]",
-            link_display
-        )
-
-    console.print(table)
-
-    # Optional Export to Markdown
-    if export_md:
-        with open(export_md, "w", encoding="utf-8") as f:
-            f.write(f"# CypherLens Report: {res.query}\n\n")
-            f.write(f"- **Category**: {res.detected_category}\n")
-            f.write(f"- **Region**: {res.region_name} ({res.currency})\n")
-            f.write(f"- **Latency**: {res.execution_time_ms}ms\n\n")
-            f.write("## 1-Click Direct Hubs\n")
-            for dl in res.deep_links:
-                f.write(f"- [{dl['title']}]({dl['url']})\n")
-            f.write("\n## Results\n\n")
-            for it in res.items:
-                f.write(f"### [{it.title}]({it.url})\n")
-                f.write(f"- **Source**: {it.source} | **Price**: {it.price or 'N/A'}\n")
-                if it.specs:
-                    f.write(f"- **Specs**: {', '.join(it.specs)}\n")
-                f.write(f"- **Summary**: {it.snippet}\n\n")
-        console.print(f"[bold green]Report exported successfully to {export_md}[/bold green]")
 
 
-@click.command(help="CypherLens - Search Simplifier and Web Intelligence Radar")
+@click.command(help="CypherLens - Conversational Search Simplifier and Price Radar")
 @click.argument("query", required=False)
-@click.option("--category", "-c", type=click.Choice(["auto", "amazon", "flight", "tech", "general"]), default="auto", help="Force specific intelligence lens")
-@click.option("--region", "-r", type=click.Choice(["auto", "de", "in", "us", "uk"]), default="auto", help="Geographic region (de=Germany/EU, in=India, us=USA, uk=UK)")
-@click.option("--max-results", "-n", default=8, help="Max number of items to return")
-@click.option("--export", "-e", type=str, help="Export results to a Markdown file (.md)")
-@click.option("--json-output", is_flag=True, help="Output results in JSON format")
+@click.option("--region", "-r", type=click.Choice(["auto", "de", "in", "us", "uk"]), default="auto", help="Geographic region (de=Germany, in=India, us=USA, uk=UK)")
+@click.option("--currency", "-c", default="EUR", help="Display currency code (EUR, INR, USD, GBP)")
 @click.option("--web", is_flag=True, help="Launch the CypherLens Web Dashboard")
 @click.option("--port", default=8000, help="Port for the web server (default 8000)")
-def main(query: Optional[str], category: str, region: str, max_results: int, export: Optional[str], json_output: bool, web: bool, port: int):
+def main(query: Optional[str], region: str, currency: str, web: bool, port: int):
     # Launch Web Server if requested
     if web:
         from cypherlens.web_app import start_server
@@ -169,45 +88,62 @@ def main(query: Optional[str], category: str, region: str, max_results: int, exp
         start_server(port=port)
         return
 
-    # If query supplied directly via CLI args
+    session = CypherChatSession(region=region, currency=currency)
+
+    # One-shot direct query
     if query:
-        with console.status(f"[bold #00f5d4]Searching web for '{query}'...[/bold #00f5d4]", spinner="dots"):
-            response = CypherOrchestrator.scout(query, category=category, region=region, max_results=max_results)
-        render_response(response, export_md=export, export_json=json_output)
+        with console.status(f"[bold #00f5d4]Analyzing & scouting for '{query}'...[/bold #00f5d4]", spinner="dots"):
+            resp = session.process_message(query)
+        render_chat_turn(resp)
         return
 
-    # Interactive REPL Mode
+    # Interactive Conversational REPL Mode
     console.print(CYPHER_BANNER)
-    console.print("[dim cyan]Type any prompt (e.g. 'RTX 4070 laptop under 1500 euros', 'frankfurt to bangalore in dec', 'Kindle Amazon') or 'exit' to quit.[/dim cyan]\n")
-
-    current_region = region
+    cfg = AIProviderManager.load_config()
+    provider_status = f"[bold green]{cfg.get('provider', 'zero_key').upper()}[/bold green]" if cfg.get("api_key") else "[dim yellow]Zero-Key (Free Mode)[/dim yellow]"
+    console.print(f"[dim]AI Provider: {provider_status} | Region: [bold cyan]{session.region.upper()}[/bold cyan] | Currency: [bold #06d6a0]{session.display_currency}[/bold #06d6a0][/dim]")
+    console.print("[dim]Commands: [bold]/region <de|in|us|uk>[/bold], [bold]/currency <EUR|INR|USD>[/bold], [bold]/key <gemini_key>[/bold], [bold]/clear[/bold], [bold]exit[/bold][/dim]\n")
 
     while True:
         try:
-            user_input = Prompt.ask(f"[bold #00f5d4]cypherlens ({current_region})[/bold #00f5d4] [dim]>[/dim]")
+            user_input = Prompt.ask(f"[bold #00f5d4]cypherlens ({session.region.upper()}|{session.display_currency})[/bold #00f5d4] [dim]>[/dim]")
             if not user_input or user_input.strip() == "":
                 continue
-            if user_input.lower().strip() in ["exit", "quit", "q"]:
+            
+            clean_cmd = user_input.strip()
+            if clean_cmd.lower() in ["exit", "quit", "q"]:
                 console.print("[bold #ffd166]Session ended. Goodbye.[/bold #ffd166]")
                 break
-            if user_input.lower().startswith("region "):
-                new_reg = user_input.split(" ")[1].strip().lower()
-                if new_reg in ["auto", "de", "in", "us", "uk"]:
-                    current_region = new_reg
-                    console.print(f"[bold green]✓ Region switched to: {current_region.upper()}[/bold green]\n")
-                else:
-                    console.print("[red]Invalid region. Choose from: de, in, us, uk, auto[/red]\n")
+            elif clean_cmd.lower() == "/clear":
+                session.reset()
+                console.print("[bold green]✓ Session memory cleared.[/bold green]\n")
                 continue
-            if user_input.lower().strip() in ["web", "ui", "dashboard"]:
+            elif clean_cmd.lower().startswith("/region "):
+                new_reg = clean_cmd.split(" ")[1].strip().lower()
+                if new_reg in ["auto", "de", "in", "us", "uk"]:
+                    session.set_region(new_reg)
+                    console.print(f"[bold green]✓ Region switched to: {new_reg.upper()}[/bold green]\n")
+                continue
+            elif clean_cmd.lower().startswith("/currency "):
+                new_curr = clean_cmd.split(" ")[1].strip().upper()
+                session.set_currency(new_curr)
+                console.print(f"[bold green]✓ Display currency switched to: {new_curr}[/bold green]\n")
+                continue
+            elif clean_cmd.lower().startswith("/key "):
+                key_val = clean_cmd.split(" ")[1].strip()
+                AIProviderManager.save_config("gemini", api_key=key_val)
+                console.print("[bold green]✓ Google Gemini API key saved successfully![/bold green]\n")
+                continue
+            elif clean_cmd.lower() in ["web", "ui", "dashboard"]:
                 from cypherlens.web_app import start_server
                 webbrowser.open(f"http://localhost:{port}")
                 start_server(port=port)
                 break
 
-            with console.status("[bold #00f5d4]Searching...[/bold #00f5d4]", spinner="dots"):
-                res = CypherOrchestrator.scout(user_input, category=category, region=current_region, max_results=max_results)
+            with console.status("[bold #00f5d4]Scouting & analyzing...[/bold #00f5d4]", spinner="dots"):
+                res = session.process_message(user_input)
             
-            render_response(res)
+            render_chat_turn(res)
             console.print("\n" + "─" * 60 + "\n")
         except (KeyboardInterrupt, EOFError):
             console.print("\n[bold #ffd166]Session ended. Exiting.[/bold #ffd166]")

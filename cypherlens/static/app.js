@@ -1,28 +1,27 @@
 /**
- * CypherLens Web Radar Client Application with Precision Parameters and Regional Routing
+ * CypherLens 2.0 Conversational Web Client Application
  */
 
 document.addEventListener("DOMContentLoaded", () => {
     // DOM Elements
-    const searchForm = document.getElementById("searchForm");
-    const queryInput = document.getElementById("queryInput");
-    const categoryPills = document.querySelectorAll(".pill");
-    const promptChips = document.querySelectorAll(".prompt-chip");
-    const regionSelect = document.getElementById("regionSelect");
+    const chatFeed = document.getElementById("chatFeed");
+    const chatForm = document.getElementById("chatForm");
+    const chatInput = document.getElementById("chatInput");
+    const chatLoading = document.getElementById("chatLoading");
+    const resetSessionBtn = document.getElementById("resetSessionBtn");
     
-    const statusSection = document.getElementById("statusSection");
-    const metaTarget = document.getElementById("metaTarget");
-    const metaLens = document.getElementById("metaLens");
-    const metaRegion = document.getElementById("metaRegion");
-    const metaNodes = document.getElementById("metaNodes");
-    const metaLatency = document.getElementById("metaLatency");
+    const regionSelect = document.getElementById("regionSelect");
+    const currencySelect = document.getElementById("currencySelect");
+    const providerBadge = document.getElementById("providerBadge");
 
-    const deepRadarSection = document.getElementById("deepRadarSection");
-    const deepRadarContainer = document.getElementById("deepRadarContainer");
-
-    const loadingContainer = document.getElementById("loadingContainer");
-    const resultsGrid = document.getElementById("resultsGrid");
-    const initialState = document.getElementById("initialState");
+    // Modal Settings
+    const openSettingsBtn = document.getElementById("openSettingsBtn");
+    const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+    const settingsModal = document.getElementById("settingsModal");
+    const aiProviderSelect = document.getElementById("aiProviderSelect");
+    const apiKeyInput = document.getElementById("apiKeyInput");
+    const modelInput = document.getElementById("modelInput");
+    const saveConfigBtn = document.getElementById("saveConfigBtn");
 
     // Watchlist Elements
     const toggleWatchlistBtn = document.getElementById("toggleWatchlistBtn");
@@ -34,221 +33,283 @@ document.addEventListener("DOMContentLoaded", () => {
     const watchlistCountBadge = document.getElementById("watchlistCount");
     const drawerCount = document.getElementById("drawerCount");
 
-    let currentCategory = "auto";
+    // Session State
+    let sessionId = "session_" + Math.random().toString(36).substring(2, 9);
     let currentRegion = localStorage.getItem("cypherlens_region") || "de";
+    let currentCurrency = localStorage.getItem("cypherlens_currency") || "EUR";
     let watchlist = JSON.parse(localStorage.getItem("cypherlens_watchlist") || "[]");
 
-    // Initialize Region Select value
+    // Initial controls state
     if (regionSelect) {
         regionSelect.value = currentRegion;
         regionSelect.addEventListener("change", (e) => {
             currentRegion = e.target.value;
             localStorage.setItem("cypherlens_region", currentRegion);
-            if (queryInput.value.trim()) {
-                performSearch(queryInput.value.trim());
-            }
         });
     }
 
-    // Update Watchlist UI on load
+    if (currencySelect) {
+        currencySelect.value = currentCurrency;
+        currencySelect.addEventListener("change", (e) => {
+            currentCurrency = e.target.value;
+            localStorage.setItem("cypherlens_currency", currentCurrency);
+        });
+    }
+
+    // Load AI Config Status
+    loadConfig();
     updateWatchlistUI();
 
-    // Category Pill Click
-    categoryPills.forEach(pill => {
-        pill.addEventListener("click", () => {
-            categoryPills.forEach(p => p.classList.remove("active"));
-            pill.classList.add("active");
-            currentCategory = pill.getAttribute("data-category");
-            if (queryInput.value.trim()) {
-                performSearch(queryInput.value.trim());
+    // Prompt Chips in Initial Card
+    document.querySelectorAll(".prompt-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            const promptText = chip.getAttribute("data-prompt");
+            if (promptText) {
+                chatInput.value = promptText;
+                sendMessage(promptText);
             }
         });
     });
 
-    // Preset Prompt Chips Click
-    promptChips.forEach(chip => {
-        chip.addEventListener("click", () => {
-            const promptText = chip.getAttribute("data-query");
-            queryInput.value = promptText;
-            performSearch(promptText);
-        });
-    });
-
-    // Search Form Submit
-    searchForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const q = queryInput.value.trim();
-        if (q) {
-            performSearch(q);
-        }
-    });
-
-    // Keyboard shortcut: '/' focuses search
-    window.addEventListener("keydown", (e) => {
-        if (e.key === "/" && document.activeElement !== queryInput) {
+    // Auto-resize textarea and handle Enter
+    chatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            queryInput.focus();
+            chatForm.dispatchEvent(new Event("submit"));
         }
     });
 
-    // Main Search Action
-    async function performSearch(query) {
-        // UI transitions
-        initialState.style.display = "none";
-        resultsGrid.innerHTML = "";
-        deepRadarContainer.innerHTML = "";
-        deepRadarSection.style.display = "none";
-        statusSection.style.display = "none";
-        loadingContainer.style.display = "block";
+    // Submit Chat Form
+    chatForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        if (text) {
+            sendMessage(text);
+        }
+    });
+
+    // Reset Conversation
+    resetSessionBtn.addEventListener("click", async () => {
+        try {
+            await fetch("/api/chat/reset", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: sessionId })
+            });
+            chatFeed.innerHTML = `
+                <div class="assistant-message glass-panel">
+                    <div class="msg-header">
+                        <span class="agent-badge">📡 CYPHERLENS RADAR ONLINE</span>
+                        <span class="agent-time">New Session</span>
+                    </div>
+                    <div class="msg-body">
+                        <p>Memory cleared. What product, flight route, or comparison would you like to scout next?</p>
+                    </div>
+                </div>
+            `;
+        } catch (err) {
+            console.error(err);
+        }
+    });
+
+    async function sendMessage(userText) {
+        // Append user bubble
+        appendUserMessage(userText);
+        chatInput.value = "";
+        chatLoading.style.display = "flex";
+        scrollToBottom();
 
         try {
-            const url = `/api/search?q=${encodeURIComponent(query)}&category=${encodeURIComponent(currentCategory)}&region=${encodeURIComponent(currentRegion)}&max_results=8`;
-            const response = await fetch(url);
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: userText,
+                    session_id: sessionId,
+                    region: currentRegion,
+                    currency: currentCurrency
+                })
+            });
+
+            chatLoading.style.display = "none";
             const data = await response.json();
 
-            loadingContainer.style.display = "none";
-
             if (!response.ok) {
-                showError(data.message || "Failed to scout web intelligence nodes.");
+                appendAssistantMessage("⚠️ **Error**: " + (data.message || "Could not process message."));
                 return;
             }
 
-            renderResults(data);
+            appendAssistantResponse(data);
         } catch (err) {
-            loadingContainer.style.display = "none";
-            showError("Network connection error. Is the CypherLens server running?");
+            chatLoading.style.display = "none";
+            appendAssistantMessage("⚠️ **Network Error**: Unable to reach CypherLens server.");
         }
     }
 
-    function renderResults(data) {
-        // Render Meta Info
-        statusSection.style.display = "block";
-        metaTarget.textContent = `"${data.query}"`;
-        metaLens.textContent = (data.detected_category || "GENERAL").toUpperCase();
-        metaRegion.textContent = data.region_name || "Germany & EU";
-        metaNodes.textContent = `${data.items ? data.items.length : 0} Nodes`;
-        metaLatency.textContent = `${data.execution_time_ms}ms`;
-
-        // Render Deep Radar Quick Hubs (Pre-Filled Links)
-        if (data.deep_links && data.deep_links.length > 0) {
-            deepRadarSection.style.display = "block";
-            deepRadarContainer.innerHTML = data.deep_links.map(link => `
-                <a href="${link.url}" target="_blank" rel="noopener noreferrer" class="radar-hub-card">
-                    <div class="hub-info">
-                        <h4>${escapeHtml(link.title)}</h4>
-                        <span class="hub-badge">${escapeHtml(link.badge || "Pre-Filled Matrix")}</span>
-                    </div>
-                    <span class="hub-arrow">↗</span>
-                </a>
-            `).join("");
-        }
-
-        // Render Cards
-        if (!data.items || data.items.length === 0) {
-            resultsGrid.innerHTML = `
-                <div class="empty-state" style="grid-column: 1 / -1;">
-                    <div class="empty-icon">⚠️</div>
-                    <h3>No intelligence nodes matched this search</h3>
-                    <p>Try refining your query or switching categories/regions above.</p>
-                </div>
-            `;
-            return;
-        }
-
-        resultsGrid.innerHTML = data.items.map((item, idx) => {
-            const isPinned = watchlist.some(w => w.url === item.url);
-            const specsHtml = item.specs && item.specs.length > 0
-                ? `<div class="card-specs">${item.specs.map(s => `<span class="spec-chip">${escapeHtml(s)}</span>`).join("")}</div>`
-                : "";
-
-            return `
-                <article class="intel-card" data-idx="${idx}">
-                    <div>
-                        <div class="card-top">
-                            <span class="source-badge">${escapeHtml(item.source)}</span>
-                            <span class="deal-badge">${escapeHtml(item.badge || "Verified Node")}</span>
-                        </div>
-                        <h3 class="card-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h3>
-                        <p class="card-snippet">${escapeHtml(item.snippet || "Direct intelligence record.")}</p>
-                        ${specsHtml}
-                    </div>
-
-                    <div>
-                        <div class="card-pricing-row">
-                            <div class="price-tag">${item.price ? escapeHtml(item.price) : '<span style="font-size:14px;color:var(--text-dim);">Live Fares</span>'}</div>
-                            ${item.rating ? `<div class="rating-tag">${escapeHtml(item.rating)}</div>` : ''}
-                        </div>
-
-                        <div class="card-actions">
-                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn-card-action">
-                                Open Deal / Route ↗
-                            </a>
-                            <button class="btn-pin ${isPinned ? 'pinned' : ''}" title="Pin to Watchlist" onclick="togglePin(${idx})">
-                                ${isPinned ? '★ Pinned' : '📌 Pin'}
-                            </button>
-                        </div>
-                    </div>
-                </article>
-            `;
-        }).join("");
-
-        // Store last items globally for pinning
-        window.lastScoutItems = data.items;
+    function appendUserMessage(text) {
+        const div = document.createElement("div");
+        div.className = "user-message";
+        div.textContent = text;
+        chatFeed.appendChild(div);
+        scrollToBottom();
     }
 
-    function showError(msg) {
-        resultsGrid.innerHTML = `
-            <div class="empty-state" style="grid-column: 1 / -1; border-color: rgba(239, 68, 68, 0.4);">
-                <div class="empty-icon">⚠️</div>
-                <h3 style="color: #f87171;">Scout Operation Interrupted</h3>
-                <p>${escapeHtml(msg)}</p>
+    function appendAssistantMessage(rawMarkdown) {
+        const div = document.createElement("div");
+        div.className = "assistant-message glass-panel";
+        div.innerHTML = `
+            <div class="msg-header">
+                <span class="agent-badge">📡 CYPHERLENS</span>
+                <span class="agent-time">${new Date().toLocaleTimeString()}</span>
+            </div>
+            <div class="msg-body">
+                ${marked.parse(rawMarkdown)}
             </div>
         `;
+        chatFeed.appendChild(div);
+        scrollToBottom();
     }
 
-    // Watchlist Management
-    window.togglePin = function(idx) {
-        if (!window.lastScoutItems || !window.lastScoutItems[idx]) return;
-        const item = window.lastScoutItems[idx];
-        const existingIdx = watchlist.findIndex(w => w.url === item.url);
+    function appendAssistantResponse(data) {
+        const div = document.createElement("div");
+        div.className = "assistant-message glass-panel";
+        const timeStr = new Date().toLocaleTimeString();
 
-        if (existingIdx >= 0) {
-            watchlist.splice(existingIdx, 1);
-        } else {
-            watchlist.push({
-                title: item.title,
-                url: item.url,
-                price: item.price,
-                source: item.source,
-                timestamp: new Date().toLocaleTimeString()
+        const struct = data.structured_data || {};
+        let extraHtml = "";
+
+        // 1. Clarification Questions Pills
+        if (data.type === "clarification" && struct.questions) {
+            extraHtml += `
+                <div class="clarify-card">
+                    ${struct.questions.map(q => `
+                        <div class="clarify-group">
+                            <div class="clarify-label">${escapeHtml(q.label)}</div>
+                            <div class="clarify-options">
+                                ${q.options.map(opt => `
+                                    <button class="btn-option-pill" onclick="sendQuickAnswer('${escapeHtml(opt)}')">${escapeHtml(opt)}</button>
+                                `).join("")}
+                            </div>
+                        </div>
+                    `).join("")}
+                </div>
+            `;
+        }
+
+        // 2. Deep Pre-Filled Matrix Links
+        if (struct.deep_links && struct.deep_links.length > 0) {
+            extraHtml += `
+                <div style="margin-top: 18px;">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--amber-glow); margin-bottom: 8px;">⚡ 1-Click Pre-Filled Direct Hubs:</div>
+                    <div class="deep-radar-grid">
+                        ${struct.deep_links.map(dl => `
+                            <a href="${dl.url}" target="_blank" rel="noopener noreferrer" class="radar-hub-card" style="padding:10px 14px;">
+                                <div class="hub-info">
+                                    <h4 style="font-size:13px;">${escapeHtml(dl.title)}</h4>
+                                    <span class="hub-badge">${escapeHtml(dl.badge || "Direct")}</span>
+                                </div>
+                                <span class="hub-arrow">↗</span>
+                            </a>
+                        `).join("")}
+                    </div>
+                </div>
+            `;
+        }
+
+        div.innerHTML = `
+            <div class="msg-header">
+                <span class="agent-badge">📡 CYPHERLENS INTEL</span>
+                <span class="agent-time">${timeStr}</span>
+            </div>
+            <div class="msg-body">
+                ${marked.parse(data.content || "")}
+                ${extraHtml}
+            </div>
+        `;
+
+        chatFeed.appendChild(div);
+        scrollToBottom();
+    }
+
+    // Global quick option click
+    window.sendQuickAnswer = function(answerText) {
+        chatInput.value = answerText;
+        sendMessage(answerText);
+    };
+
+    function scrollToBottom() {
+        chatFeed.scrollTop = chatFeed.scrollHeight;
+    }
+
+    // BYOK Config Modal
+    async function loadConfig() {
+        try {
+            const r = await fetch("/api/config");
+            if (r.ok) {
+                const cfg = await r.json();
+                aiProviderSelect.value = cfg.provider || "zero_key";
+                if (cfg.has_api_key) {
+                    providerBadge.textContent = `AI: ${cfg.provider.toUpperCase()} (Connected)`;
+                    providerBadge.style.color = "var(--cyan-glow)";
+                } else {
+                    providerBadge.textContent = `AI: Zero-Key (Free)`;
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    openSettingsBtn.addEventListener("click", () => {
+        settingsModal.style.display = "flex";
+    });
+
+    closeSettingsBtn.addEventListener("click", () => {
+        settingsModal.style.display = "none";
+    });
+
+    settingsModal.addEventListener("click", (e) => {
+        if (e.target === settingsModal) {
+            settingsModal.style.display = "none";
+        }
+    });
+
+    saveConfigBtn.addEventListener("click", async () => {
+        const provider = aiProviderSelect.value;
+        const apiKey = apiKeyInput.value.trim();
+        const model = modelInput.value.trim();
+
+        try {
+            const r = await fetch("/api/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    provider: provider,
+                    api_key: apiKey,
+                    model: model,
+                    default_currency: currentCurrency,
+                    default_region: currentRegion
+                })
             });
+
+            if (r.ok) {
+                settingsModal.style.display = "none";
+                apiKeyInput.value = "";
+                loadConfig();
+            }
+        } catch (err) {
+            alert("Failed to save settings.");
         }
+    });
 
-        localStorage.setItem("cypherlens_watchlist", JSON.stringify(watchlist));
-        updateWatchlistUI();
-        
-        // Update pin button styling
-        const pinBtn = document.querySelectorAll(".intel-card")[idx]?.querySelector(".btn-pin");
-        if (pinBtn) {
-            const isPinned = watchlist.some(w => w.url === item.url);
-            pinBtn.className = `btn-pin ${isPinned ? 'pinned' : ''}`;
-            pinBtn.innerHTML = isPinned ? '★ Pinned' : '📌 Pin';
-        }
-    };
-
-    window.removePinnedItem = function(url) {
-        watchlist = watchlist.filter(w => w.url !== url);
-        localStorage.setItem("cypherlens_watchlist", JSON.stringify(watchlist));
-        updateWatchlistUI();
-    };
-
+    // Watchlist Drawer
     function updateWatchlistUI() {
         const count = watchlist.length;
         watchlistCountBadge.textContent = count;
         drawerCount.textContent = count;
 
         if (count === 0) {
-            watchlistItemsContainer.innerHTML = '<p class="empty-drawer-msg">No items pinned yet. Click 📌 on any search card to save it here for comparison.</p>';
+            watchlistItemsContainer.innerHTML = '<p class="empty-drawer-msg">No items pinned yet. Pinned products and comparisons will appear here.</p>';
             return;
         }
 
@@ -259,15 +320,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span style="color: var(--emerald-green); font-weight:700; font-family:var(--font-mono); font-size:13px;">${item.price || 'Deal'}</span>
                     <span style="font-size:11px; color:var(--text-dim);">[${escapeHtml(item.source)}]</span>
                 </div>
-                <div style="display:flex; gap:8px; margin-top:8px;">
-                    <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn-card-action" style="padding:4px 8px; font-size:11px;">View ↗</a>
-                    <button class="btn-pin" style="padding:4px 8px; font-size:11px;" onclick="removePinnedItem('${escapeHtml(item.url)}')">Remove</button>
-                </div>
             </div>
         `).join("");
     }
 
-    // Drawer Toggles
     toggleWatchlistBtn.addEventListener("click", () => {
         watchlistDrawer.classList.add("open");
         drawerOverlay.classList.add("open");
