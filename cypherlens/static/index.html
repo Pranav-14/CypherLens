@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CypherLens — Web Search Simplifier & Price Radar</title>
+    <meta name="description" content="A zero-cost, real-time search simplifier and price radar. Instant products, flights, and hardware comparison.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="cyber-bg"></div>
+    <div class="grid-overlay"></div>
+
+    <div class="app-container">
+        <!-- Top Navigation -->
+        <header class="app-header">
+            <div class="brand-group">
+                <div class="radar-pulse-icon">
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-dot"></div>
+                </div>
+                <div class="brand-text">
+                    <h1 class="brand-title">CYPHER<span>LENS</span></h1>
+                    <p class="brand-tagline">Real-time search simplifier &amp; price radar</p>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <button id="toggleWatchlistBtn" class="btn-secondary" title="View Pinned Deals">
+                    <span class="btn-icon">📌</span> Watchlist <span id="watchlistCount" class="badge-counter">0</span>
+                </button>
+                <div class="system-status">
+                    <span class="status-indicator online"></span> RADAR ACTIVE
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Search Radar Section -->
+        <section class="search-section">
+            <div class="search-card glass-panel">
+                <form id="searchForm" class="search-form">
+                    <div class="search-input-wrapper">
+                        <span class="search-crosshair">🎯</span>
+                        <input 
+                            type="text" 
+                            id="queryInput" 
+                            class="search-input" 
+                            placeholder="Enter prompt (e.g. 'RTX 4060 laptop under $1000', 'flights from NYC to Tokyo in Nov', 'Sony XM5 Amazon')..."
+                            autocomplete="off"
+                            required
+                        >
+                        <button type="submit" id="searchSubmitBtn" class="btn-search">
+                            <span>SEARCH</span>
+                            <span class="btn-glow"></span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Category Filters -->
+                <div class="category-pills">
+                    <button class="pill active" data-category="auto">⚡ Auto Detect</button>
+                    <button class="pill" data-category="amazon">📦 Amazon Deals</button>
+                    <button class="pill" data-category="flight">✈️ Flight Radar</button>
+                    <button class="pill" data-category="tech">💻 Tech & Laptops</button>
+                    <button class="pill" data-category="general">🌐 Web Search</button>
+                </div>
+
+                <!-- Quick Query Chips -->
+                <div class="quick-prompts">
+                    <span class="quick-label">Presets:</span>
+                    <button class="prompt-chip" data-query="RTX 4060 gaming laptops under $1000">🎮 RTX 4060 Laptops &lt; $1000</button>
+                    <button class="prompt-chip" data-query="flights from NYC to London next month">✈️ NYC ➔ London Flights</button>
+                    <button class="prompt-chip" data-query="Sony WH-1000XM5 headphones on Amazon">🎧 Sony XM5 Amazon</button>
+                    <button class="prompt-chip" data-query="Best OLED smartphones 2026 deals">📱 OLED Flagship Phones</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Deep Radar Hubs (Launchpad) -->
+        <section id="deepRadarSection" class="deep-radar-section" style="display: none;">
+            <div class="section-header">
+                <h3>⚡ 1-Click Direct Hubs</h3>
+                <span class="section-subtitle">Deep queries across verified platforms</span>
+            </div>
+            <div id="deepRadarContainer" class="deep-radar-grid"></div>
+        </section>
+
+        <!-- Search Status / Meta -->
+        <section id="statusSection" class="status-section" style="display: none;">
+            <div class="meta-strip glass-panel">
+                <div class="meta-item">
+                    <span class="meta-label">TARGET</span>
+                    <span id="metaTarget" class="meta-val highlight">-</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">LENS</span>
+                    <span id="metaLens" class="meta-val badge-lens">-</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">RESULTS</span>
+                    <span id="metaNodes" class="meta-val">-</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">LATENCY</span>
+                    <span id="metaLatency" class="meta-val">-</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading State -->
+        <div id="loadingContainer" class="loading-container" style="display: none;">
+            <div class="scanner-ring">
+                <div class="scanner-sweep"></div>
+            </div>
+            <p class="loading-text">Searching web matrix in real-time...</p>
+        </div>
+
+        <!-- Results Grid -->
+        <main class="results-main">
+            <div id="resultsGrid" class="results-grid"></div>
+
+            <!-- Empty State Initial -->
+            <div id="initialState" class="empty-state">
+                <div class="empty-icon">📡</div>
+                <h2>CypherLens Search Ready</h2>
+                <p>Type any product, flight route, tech spec, or search prompt above to get clean, ad-free clickable cards in real time.</p>
+                <div class="feature-bullets">
+                    <div class="feature-card">
+                        <span class="f-icon">⚡</span>
+                        <h4>Zero Cost &amp; No API Keys</h4>
+                        <p>100% free scraping and aggregation engine with no paid tiers or setup required.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="f-icon">🎯</span>
+                        <h4>Ad-Free Clickable Cards</h4>
+                        <p>Strips out 100% of affiliate spam and delivers direct, actionable buy links.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="f-icon">✈️</span>
+                        <h4>Flight &amp; Price Matrix</h4>
+                        <p>Deep-links directly into Google Flights, Skyscanner, and Amazon search engines.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Pinned Watchlist Drawer -->
+    <div id="watchlistDrawer" class="watchlist-drawer">
+        <div class="drawer-header">
+            <h3>📌 Pinned Items (<span id="drawerCount">0</span>)</h3>
+            <button id="closeDrawerBtn" class="btn-close">✕</button>
+        </div>
+        <div id="watchlistItems" class="drawer-content">
+            <p class="empty-drawer-msg">No items pinned yet. Click 📌 on any search card to save it here for comparison.</p>
+        </div>
+        <div class="drawer-footer">
+            <button id="clearWatchlistBtn" class="btn-danger-outline">Clear All</button>
+        </div>
+    </div>
+    <div id="drawerOverlay" class="drawer-overlay"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
