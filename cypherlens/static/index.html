@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CypherLens — Web Search Simplifier & Price Radar</title>
-    <meta name="description" content="A zero-cost, real-time search simplifier and price radar. Instant products, flights, and hardware comparison.">
+    <title>CypherLens — Precision Web Search Simplifier & Price Radar</title>
+    <meta name="description" content="A zero-cost, real-time search simplifier and price radar. Instant products, flights, and hardware comparison across Germany/EU, India, US, and UK.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -24,11 +24,22 @@
                 </div>
                 <div class="brand-text">
                     <h1 class="brand-title">CYPHER<span>LENS</span></h1>
-                    <p class="brand-tagline">Real-time search simplifier &amp; price radar</p>
+                    <p class="brand-tagline">Precision search simplifier &amp; regional price radar</p>
                 </div>
             </div>
 
             <div class="header-actions">
+                <!-- Regional Hub Selector -->
+                <div class="region-selector-wrapper">
+                    <span class="region-icon">🌍</span>
+                    <select id="regionSelect" class="region-select">
+                        <option value="de" selected>🇩🇪 Germany &amp; EU (€)</option>
+                        <option value="in">🇮🇳 India (₹)</option>
+                        <option value="us">🇺🇸 USA &amp; Global ($)</option>
+                        <option value="uk">🇬🇧 UK (£)</option>
+                    </select>
+                </div>
+
                 <button id="toggleWatchlistBtn" class="btn-secondary" title="View Pinned Deals">
                     <span class="btn-icon">📌</span> Watchlist <span id="watchlistCount" class="badge-counter">0</span>
                 </button>
@@ -48,7 +59,7 @@
                             type="text" 
                             id="queryInput" 
                             class="search-input" 
-                            placeholder="Enter prompt (e.g. 'RTX 4060 laptop under $1000', 'flights from NYC to Tokyo in Nov', 'Sony XM5 Amazon')..."
+                            placeholder="Enter prompt (e.g. 'RTX 4070 laptop under 1500 euros', 'frankfurt to bangalore dec 12 to jan 17', 'Kindle Amazon')..."
                             autocomplete="off"
                             required
                         >
@@ -62,18 +73,18 @@
                 <!-- Category Filters -->
                 <div class="category-pills">
                     <button class="pill active" data-category="auto">⚡ Auto Detect</button>
-                    <button class="pill" data-category="amazon">📦 Amazon Deals</button>
-                    <button class="pill" data-category="flight">✈️ Flight Radar</button>
-                    <button class="pill" data-category="tech">💻 Tech & Laptops</button>
+                    <button class="pill" data-category="amazon">📦 Shopping &amp; Deals</button>
+                    <button class="pill" data-category="flight">✈️ Flight Matrix</button>
+                    <button class="pill" data-category="tech">💻 Tech &amp; Hardware</button>
                     <button class="pill" data-category="general">🌐 Web Search</button>
                 </div>
 
-                <!-- Quick Query Chips -->
+                <!-- Quick Query Chips (Region-aware presets) -->
                 <div class="quick-prompts">
                     <span class="quick-label">Presets:</span>
-                    <button class="prompt-chip" data-query="RTX 4060 gaming laptops under $1000">🎮 RTX 4060 Laptops &lt; $1000</button>
-                    <button class="prompt-chip" data-query="flights from NYC to London next month">✈️ NYC ➔ London Flights</button>
-                    <button class="prompt-chip" data-query="Sony WH-1000XM5 headphones on Amazon">🎧 Sony XM5 Amazon</button>
+                    <button class="prompt-chip" data-query="frankfurt to bangalore december 12th to january 17th">✈️ Frankfurt ➔ Bangalore (Dec-Jan)</button>
+                    <button class="prompt-chip" data-query="RTX 4070 gaming laptop under 1500 euros">💻 RTX 4070 Laptop &lt; 1500€</button>
+                    <button class="prompt-chip" data-query="Sony WH-1000XM5 headphones amazon deals">🎧 Sony XM5 Headphones</button>
                     <button class="prompt-chip" data-query="Best OLED smartphones 2026 deals">📱 OLED Flagship Phones</button>
                 </div>
             </div>
@@ -82,8 +93,8 @@
         <!-- Deep Radar Hubs (Launchpad) -->
         <section id="deepRadarSection" class="deep-radar-section" style="display: none;">
             <div class="section-header">
-                <h3>⚡ 1-Click Direct Hubs</h3>
-                <span class="section-subtitle">Deep queries across verified platforms</span>
+                <h3>⚡ 1-Click Direct Hubs &amp; Pre-Filled Route Matrix</h3>
+                <span class="section-subtitle">Deep links pre-filled with exact airport codes, dates, and regional stores</span>
             </div>
             <div id="deepRadarContainer" class="deep-radar-grid"></div>
         </section>
@@ -98,6 +109,10 @@
                 <div class="meta-item">
                     <span class="meta-label">LENS</span>
                     <span id="metaLens" class="meta-val badge-lens">-</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">REGION</span>
+                    <span id="metaRegion" class="meta-val badge-region">-</span>
                 </div>
                 <div class="meta-item">
                     <span class="meta-label">RESULTS</span>
@@ -115,7 +130,7 @@
             <div class="scanner-ring">
                 <div class="scanner-sweep"></div>
             </div>
-            <p class="loading-text">Searching web matrix in real-time...</p>
+            <p class="loading-text">Scouting regional web matrix in real-time...</p>
         </div>
 
         <!-- Results Grid -->
@@ -125,23 +140,23 @@
             <!-- Empty State Initial -->
             <div id="initialState" class="empty-state">
                 <div class="empty-icon">📡</div>
-                <h2>CypherLens Search Ready</h2>
-                <p>Type any product, flight route, tech spec, or search prompt above to get clean, ad-free clickable cards in real time.</p>
+                <h2>CypherLens Precision Radar Ready</h2>
+                <p>Type any product, flight route with dates, tech spec, or search prompt above to get clean, ad-free clickable cards with exact pre-filled links in real time.</p>
                 <div class="feature-bullets">
                     <div class="feature-card">
-                        <span class="f-icon">⚡</span>
-                        <h4>Zero Cost &amp; No API Keys</h4>
-                        <p>100% free scraping and aggregation engine with no paid tiers or setup required.</p>
-                    </div>
-                    <div class="feature-card">
-                        <span class="f-icon">🎯</span>
-                        <h4>Ad-Free Clickable Cards</h4>
-                        <p>Strips out 100% of affiliate spam and delivers direct, actionable buy links.</p>
-                    </div>
-                    <div class="feature-card">
                         <span class="f-icon">✈️</span>
-                        <h4>Flight &amp; Price Matrix</h4>
-                        <p>Deep-links directly into Google Flights, Skyscanner, and Amazon search engines.</p>
+                        <h4>Precision Route Formatter</h4>
+                        <p>Automatically resolves city names to exact IATA airport codes (<code>FRA</code>, <code>BLR</code>) and parses dates directly into Google Flights &amp; Skyscanner.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="f-icon">🌍</span>
+                        <h4>Regional Localization</h4>
+                        <p>Searches localized stores (Idealo.de, Geizhals, Amazon.de for Germany/EU; Flipkart &amp; Amazon.in for India; Best Buy for US) in local currencies.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="f-icon">💰</span>
+                        <h4>100% Free &amp; Zero Setup</h4>
+                        <p>Completely free, no login or API keys needed. Open source and ready to run.</p>
                     </div>
                 </div>
             </div>

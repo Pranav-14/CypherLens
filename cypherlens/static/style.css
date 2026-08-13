@@ -130,13 +130,49 @@ body {
 .brand-tagline {
     font-size: 13px;
     color: var(--text-muted);
-    font-style: italic;
 }
 
 .header-actions {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
+}
+
+/* Region Selector */
+.region-selector-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-md);
+    padding: 4px 10px;
+    transition: var(--transition);
+}
+
+.region-selector-wrapper:hover {
+    border-color: var(--cyan-glow);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.region-icon {
+    font-size: 14px;
+}
+
+.region-select {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-family: var(--font-main);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.region-select option {
+    background: #0f172a;
+    color: #ffffff;
 }
 
 .system-status {
@@ -439,6 +475,16 @@ body {
     border-radius: var(--radius-sm);
     font-family: var(--font-mono);
     font-size: 12px;
+}
+
+.badge-region {
+    background: rgba(6, 214, 160, 0.15);
+    color: var(--emerald-green);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border: 1px solid rgba(6, 214, 160, 0.3);
 }
 
 /* Loading Scanner Animation */
@@ -832,6 +878,7 @@ body {
     }
     .header-actions {
         width: 100%;
+        flex-wrap: wrap;
         justify-content: space-between;
     }
     .search-input-wrapper {

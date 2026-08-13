@@ -25,6 +25,9 @@ class SearchResultItem(BaseModel):
 class LensResponse(BaseModel):
     query: str
     detected_category: str
+    region: str = "de"
+    region_name: str = "Germany & EU"
+    currency: str = "EUR"
     summary: str = ""
     items: List[SearchResultItem] = Field(default_factory=list)
     deep_links: List[Dict[str, str]] = Field(default_factory=list)

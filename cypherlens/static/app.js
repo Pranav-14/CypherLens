@@ -1,5 +1,5 @@
 /**
- * CypherLens Web Radar Client Application
+ * CypherLens Web Radar Client Application with Precision Parameters and Regional Routing
  */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -8,10 +8,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const queryInput = document.getElementById("queryInput");
     const categoryPills = document.querySelectorAll(".pill");
     const promptChips = document.querySelectorAll(".prompt-chip");
+    const regionSelect = document.getElementById("regionSelect");
     
     const statusSection = document.getElementById("statusSection");
     const metaTarget = document.getElementById("metaTarget");
     const metaLens = document.getElementById("metaLens");
+    const metaRegion = document.getElementById("metaRegion");
     const metaNodes = document.getElementById("metaNodes");
     const metaLatency = document.getElementById("metaLatency");
 
@@ -33,7 +35,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const drawerCount = document.getElementById("drawerCount");
 
     let currentCategory = "auto";
+    let currentRegion = localStorage.getItem("cypherlens_region") || "de";
     let watchlist = JSON.parse(localStorage.getItem("cypherlens_watchlist") || "[]");
+
+    // Initialize Region Select value
+    if (regionSelect) {
+        regionSelect.value = currentRegion;
+        regionSelect.addEventListener("change", (e) => {
+            currentRegion = e.target.value;
+            localStorage.setItem("cypherlens_region", currentRegion);
+            if (queryInput.value.trim()) {
+                performSearch(queryInput.value.trim());
+            }
+        });
+    }
 
     // Update Watchlist UI on load
     updateWatchlistUI();
@@ -87,7 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
         loadingContainer.style.display = "block";
 
         try {
-            const url = `/api/search?q=${encodeURIComponent(query)}&category=${encodeURIComponent(currentCategory)}&max_results=8`;
+            const url = `/api/search?q=${encodeURIComponent(query)}&category=${encodeURIComponent(currentCategory)}&region=${encodeURIComponent(currentRegion)}&max_results=8`;
             const response = await fetch(url);
             const data = await response.json();
 
@@ -110,17 +125,18 @@ document.addEventListener("DOMContentLoaded", () => {
         statusSection.style.display = "block";
         metaTarget.textContent = `"${data.query}"`;
         metaLens.textContent = (data.detected_category || "GENERAL").toUpperCase();
+        metaRegion.textContent = data.region_name || "Germany & EU";
         metaNodes.textContent = `${data.items ? data.items.length : 0} Nodes`;
         metaLatency.textContent = `${data.execution_time_ms}ms`;
 
-        // Render Deep Radar Quick Hubs
+        // Render Deep Radar Quick Hubs (Pre-Filled Links)
         if (data.deep_links && data.deep_links.length > 0) {
             deepRadarSection.style.display = "block";
             deepRadarContainer.innerHTML = data.deep_links.map(link => `
                 <a href="${link.url}" target="_blank" rel="noopener noreferrer" class="radar-hub-card">
                     <div class="hub-info">
-                        <h4>${link.title}</h4>
-                        <span class="hub-badge">${link.badge || "Radar"}</span>
+                        <h4>${escapeHtml(link.title)}</h4>
+                        <span class="hub-badge">${escapeHtml(link.badge || "Pre-Filled Matrix")}</span>
                     </div>
                     <span class="hub-arrow">↗</span>
                 </a>
@@ -133,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="empty-state" style="grid-column: 1 / -1;">
                     <div class="empty-icon">⚠️</div>
                     <h3>No intelligence nodes matched this search</h3>
-                    <p>Try refining your query or switching categories above.</p>
+                    <p>Try refining your query or switching categories/regions above.</p>
                 </div>
             `;
             return;
@@ -142,7 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
         resultsGrid.innerHTML = data.items.map((item, idx) => {
             const isPinned = watchlist.some(w => w.url === item.url);
             const specsHtml = item.specs && item.specs.length > 0
-                ? `<div class="card-specs">${item.specs.map(s => `<span class="spec-chip">${s}</span>`).join("")}</div>`
+                ? `<div class="card-specs">${item.specs.map(s => `<span class="spec-chip">${escapeHtml(s)}</span>`).join("")}</div>`
                 : "";
 
             return `
@@ -150,22 +166,22 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div>
                         <div class="card-top">
                             <span class="source-badge">${escapeHtml(item.source)}</span>
-                            <span class="deal-badge">${escapeHtml(item.badge || "Deal Node")}</span>
+                            <span class="deal-badge">${escapeHtml(item.badge || "Verified Node")}</span>
                         </div>
                         <h3 class="card-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h3>
-                        <p class="card-snippet">${escapeHtml(item.snippet || "Clean intelligence record.")}</p>
+                        <p class="card-snippet">${escapeHtml(item.snippet || "Direct intelligence record.")}</p>
                         ${specsHtml}
                     </div>
 
                     <div>
                         <div class="card-pricing-row">
-                            <div class="price-tag">${item.price ? escapeHtml(item.price) : '<span style="font-size:14px;color:var(--text-dim);">Live Pricing</span>'}</div>
+                            <div class="price-tag">${item.price ? escapeHtml(item.price) : '<span style="font-size:14px;color:var(--text-dim);">Live Fares</span>'}</div>
                             ${item.rating ? `<div class="rating-tag">${escapeHtml(item.rating)}</div>` : ''}
                         </div>
 
                         <div class="card-actions">
                             <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn-card-action">
-                                Open Deal ↗
+                                Open Deal / Route ↗
                             </a>
                             <button class="btn-pin ${isPinned ? 'pinned' : ''}" title="Pin to Watchlist" onclick="togglePin(${idx})">
                                 ${isPinned ? '★ Pinned' : '📌 Pin'}
@@ -244,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span style="font-size:11px; color:var(--text-dim);">[${escapeHtml(item.source)}]</span>
                 </div>
                 <div style="display:flex; gap:8px; margin-top:8px;">
-                    <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn-card-action" style="padding:4px 8px; font-size:11px;">View Deal ↗</a>
+                    <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn-card-action" style="padding:4px 8px; font-size:11px;">View ↗</a>
                     <button class="btn-pin" style="padding:4px 8px; font-size:11px;" onclick="removePinnedItem('${escapeHtml(item.url)}')">Remove</button>
                 </div>
             </div>

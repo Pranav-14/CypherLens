@@ -1,49 +1,56 @@
 """
 Query Intent Classifier and Entity Extractor for CypherLens.
-Detects whether a prompt is for flights, Amazon products, tech/gadgets, or general search.
+Detects whether a prompt is for flights, Amazon/shopping products, tech/gadgets, or general search.
 """
 
 import re
 from typing import Dict, Any, Optional
+from cypherlens.engines.geo_resolver import AIRPORT_IATA_MAP, GeoResolver
 
 
 class QueryParser:
     FLIGHT_KEYWORDS = [
-        "flight", "flights", "fly", "flying", "plane", "ticket", "airline",
-        "from", "to", "trip", "roundtrip", "one way", "layover", "airport"
+        "flight", "flights", "fly", "flying", "plane", "ticket", "tickets", "airline", "airlines",
+        "trip", "roundtrip", "one way", "oneway", "layover", "airport", "nonstop", "non-stop"
     ]
     
     AMAZON_KEYWORDS = [
-        "amazon", "prime", "buy on amazon", "amazon.in", "amazon.com"
+        "amazon", "prime", "buy on amazon", "amazon.de", "amazon.in", "amazon.com", "idealo", "flipkart"
     ]
     
     TECH_KEYWORDS = [
         "laptop", "laptops", "gpu", "rtx", "gtx", "cpu", "processor", "ram",
-        "pc", "monitor", "keyboard", "mouse", "headphone", "headphones",
-        "earbuds", "phone", "smartphone", "iphone", "samsung", "pixel",
-        "macbook", "oled", "4k", "tablet", "ipad", "console", "ps5", "xbox"
+        "pc", "monitor", "monitors", "keyboard", "keyboards", "mouse", "headphone", "headphones",
+        "earbuds", "phone", "phones", "smartphone", "smartphones", "iphone", "samsung", "pixel",
+        "macbook", "oled", "4k", "tablet", "ipad", "console", "ps5", "xbox", "geforce", "radeon"
     ]
 
     @classmethod
     def classify_intent(cls, query: str) -> str:
         q_lower = query.lower()
 
-        # Check explicit Amazon mention
+        # 1. Explicit keyword check for flights
+        if any(w in q_lower for w in cls.FLIGHT_KEYWORDS):
+            return "flight"
+
+        # 2. Check "<City1> to <City2>" flight pattern (e.g. "frankfurt to bangalore")
+        to_match = re.search(r"([a-z\s]+?)\s+to\s+([a-z\s]+)", q_lower)
+        if to_match:
+            c1 = to_match.group(1).replace("flights", "").replace("flight", "").strip().split(" ")[-1]
+            c2 = to_match.group(2).strip().split(" ")[0]
+            if GeoResolver.resolve_iata(c1) or GeoResolver.resolve_iata(c2):
+                return "flight"
+
+        # 3. Explicit Shopping / Amazon check
         if any(w in q_lower for w in cls.AMAZON_KEYWORDS):
             return "amazon"
 
-        # Check Flight patterns
-        if any(w in q_lower for w in ["flight", "flights", "fly to", "plane to"]) or (
-            "from " in q_lower and " to " in q_lower
-        ):
-            return "flight"
-
-        # Check Tech patterns
-        if any(w in q_lower for w in cls.TECH_KEYWORDS) or re.search(r"\b(rtx|gtx|intel|amd|ryzen|snapdragon)\b", q_lower):
+        # 4. Tech check
+        if any(w in q_lower for w in cls.TECH_KEYWORDS) or re.search(r"\b(rtx\s*\d{4}|gtx\s*\d{4}|intel|amd|ryzen|snapdragon|m\d\s*chip)\b", q_lower):
             return "tech"
 
-        # Check shopping/product intent
-        if any(w in q_lower for w in ["buy", "price", "deals", "under $", "under ₹", "best price", "cheap", "cost of"]):
+        # 5. Generic shopping intent
+        if any(w in q_lower for w in ["buy", "price", "deals", "under €", "under $", "under ₹", "best price", "cheap", "cost of", "euros"]):
             return "amazon"
 
         return "general"
@@ -51,8 +58,7 @@ class QueryParser:
     @classmethod
     def parse_flight_entities(cls, query: str) -> Dict[str, Any]:
         """
-        Extracts origin, destination, approximate dates from a flight query.
-        e.g. 'flights from NYC to London in November' -> origin: NYC, destination: London, date: November
+        Extracts origin, destination, and dates from a flight query.
         """
         entities = {
             "origin": "",
@@ -60,43 +66,32 @@ class QueryParser:
             "date": "",
             "trip_type": "roundtrip"
         }
-        q = query
+        q_clean = query
 
-        # Pattern: from <X> to <Y> [in/on/next <Z>]
-        match = re.search(r"from\s+([A-Za-z\s]+?)\s+to\s+([A-Za-z\s]+?)(?:\s+(?:in|on|for|during|next)\s+(.+))?$", q, re.IGNORECASE)
-        if match:
-            entities["origin"] = match.group(1).strip()
-            entities["destination"] = match.group(2).strip()
-            if match.group(3):
-                entities["date"] = match.group(3).strip()
+        # Pattern: from <X> to <Y>
+        match_from_to = re.search(r"from\s+([A-Za-z\s]+?)\s+to\s+([A-Za-z\s]+?)(?:\s+(?:in|on|for|during|next|december|january|february|march|april|may|june|july|august|september|october|november|dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov)\b|\d{1,2}|$)", q_clean, re.IGNORECASE)
+        if match_from_to:
+            entities["origin"] = match_from_to.group(1).strip()
+            entities["destination"] = match_from_to.group(2).strip()
         else:
-            # Pattern: <X> to <Y>
-            match2 = re.search(r"([A-Za-z\s]+?)\s+to\s+([A-Za-z\s]+?)(?:\s+(?:in|on|for|during|next)\s+(.+))?$", q, re.IGNORECASE)
-            if match2:
-                origin_candidate = match2.group(1).replace("flights", "").replace("flight", "").strip()
-                entities["origin"] = origin_candidate
-                entities["destination"] = match2.group(2).strip()
-                if match2.group(3):
-                    entities["date"] = match2.group(3).strip()
-
-        if "one way" in q.lower() or "oneway" in q.lower():
-            entities["trip_type"] = "oneway"
+            # Pattern: <X> to <Y> (e.g. frankfurt to bangalore)
+            match_to = re.search(r"([A-Za-z\s]+?)\s+to\s+([A-Za-z\s]+?)(?:\s+(?:in|on|for|during|next|december|january|february|march|april|may|june|july|august|september|october|november|dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov)\b|\d{1,2}|$)", q_clean, re.IGNORECASE)
+            if match_to:
+                cand1 = match_to.group(1).replace("flights", "").replace("flight", "").strip()
+                entities["origin"] = cand1
+                entities["destination"] = match_to.group(2).strip()
 
         return entities
 
     @classmethod
     def parse_budget_and_specs(cls, query: str) -> Dict[str, Any]:
-        """
-        Extracts price limits and tech specs from query.
-        """
         info = {
             "budget": None,
             "currency": None,
             "specs": []
         }
         
-        # Match "under 1000", "below $1200", "under ₹50000", "< 500"
-        budget_match = re.search(r"(?:under|below|less than|<|budget of)\s*([$₹€£]?)\s*([\d,]+(?:\.\d+)?)\s*(k|kilo|usd|inr|eur|gbp)?", query, re.IGNORECASE)
+        budget_match = re.search(r"(?:under|below|less than|<|budget of)\s*([$₹€£]?)\s*([\d,]+(?:\.\d+)?)\s*(k|kilo|usd|inr|eur|gbp|euros?|rupees?|dollars?)?", query, re.IGNORECASE)
         if budget_match:
             curr_symbol = budget_match.group(1) or ""
             amount_str = budget_match.group(2).replace(",", "")
@@ -107,11 +102,10 @@ class QueryParser:
                 if multiplier.lower() in ["k", "kilo"]:
                     amount *= 1000
                 info["budget"] = amount
-                info["currency"] = curr_symbol or ("USD" if not curr_symbol else curr_symbol)
+                info["currency"] = curr_symbol or "EUR"
             except ValueError:
                 pass
 
-        # Spec detection
         q_lower = query.lower()
         if "16gb" in q_lower or "32gb" in q_lower or "64gb" in q_lower or "8gb" in q_lower:
             spec = re.search(r"\b(\d+gb)\b", q_lower)
